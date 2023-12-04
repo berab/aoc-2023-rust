@@ -1,98 +1,66 @@
 use std::fs::read_to_string;
+use std::collections::HashMap;
 
-pub fn read_lines(filename: &str) -> Vec<String> {
-    let mut result = Vec::new();
 
-    for line in read_to_string(filename).unwrap().lines() {
-        result.push(line.to_string())
-    }
-    result
-}
+fn is_hand_valid<'a>(hand_string: &'a str, max_needed_colors: &mut HashMap::<&'a str, u32>) -> bool { // Why did I have to use a named lifetime here?
+    let mut total_colors = HashMap::<&str, u32>::new();
+    total_colors.insert("red", 12);
+    total_colors.insert("green", 13);
+    total_colors.insert("blue", 14);
 
-struct Colors {
-    red: u32,
-    green: u32,
-    blue: u32,
-}
-
-fn is_hand_valid(hand_string: &str) -> bool {
-    let max_colors = Colors { red: 12, green: 13, blue: 14 };
-
+    let mut illegal_hand = false;
     let numbers_colors = hand_string.split(", ");
     for number_color in numbers_colors {
+        let n_color: u32;
+        let tuple_number_color = number_color.split_once(" ").unwrap();
+        n_color = tuple_number_color.0.parse().unwrap();
 
-        // Why does this have to be mutable?
-        let mut num_color_iterator = number_color.split_whitespace(); 
-
-        let num_of_color: u32;
-        match num_color_iterator.next() {
-            Some(num) => {
-                match num.parse() {
-                    Ok(n) => {
-                        num_of_color = n;
-                    }
-                    Err(e) => {
-                        println!("{ }", e);
-                        return false; // Q:Are these necessary?
-                    }
-                }
-            }
-            None => {
-                return false;
-                }
+        // PART 1
+        if total_colors.get(tuple_number_color.1).unwrap() < &n_color {
+            illegal_hand = true;
         }
-        
 
-        match num_color_iterator.next() {
-            Some(color) => {
-                //println!("for { } { }", num_of_color, color);
-                if color == "red" && num_of_color > max_colors.red {
-                    return false
-                } else if color == "green" && num_of_color > max_colors.green {
-                    return false
-                } else if color == "blue" && num_of_color > max_colors.blue {
-                    return false
-                }
-            }
-            None => { 
-                return false; 
-                }
+        // PART 2
+        if max_needed_colors.get(tuple_number_color.1).unwrap() < &n_color {
+            max_needed_colors.insert(tuple_number_color.1, n_color);
         }
     }
-    return true;
-
+    !illegal_hand
 }
 
-fn is_game_valid(game_string: &String) -> bool {
-    
-    let mut split_gameid_trials = game_string.split(": "); // I had to make this mut. not sure why?
-    match split_gameid_trials.nth(1) {
-        Some(hands) => {
-            let hand_iteriator = hands.split("; ");
-            for hand in hand_iteriator {
-                if !is_hand_valid(hand) {
-                    return is_hand_valid(hand);
-                }
-            }
-        }
-        None => { 
-            println!("Smt unexpected happening over here!");
-            return false
+fn is_game_valid(game_string: &String) -> (bool, u32) {
+    let mut max_needed_colors = HashMap::<&str, u32>::new();
+    max_needed_colors.insert("red", 0);
+    max_needed_colors.insert("green", 0);
+    max_needed_colors.insert("blue", 0);
+   
+    let mut illegal_games = false;
+    let (_game_id, hands_string) = game_string.split_once(": ").unwrap();
+    let hands_itr = hands_string.split("; ");
+    for hand in hands_itr {
+        if !is_hand_valid(hand, &mut max_needed_colors) {
+            illegal_games = true;
         }
     }
-    true
+    (!illegal_games, 
+    (max_needed_colors.get("red").unwrap()*
+    max_needed_colors.get("green").unwrap()*
+    max_needed_colors.get("blue").unwrap()))
 }
 
-pub fn solve_part1() -> u32 {
-    let games: Vec<String> = read_lines("inputs/p2_input.txt");
+pub fn solve() -> (u32, u32) {
+    let games: Vec<String> = read_to_string("inputs/p2_input.txt").unwrap().lines().map(String::from).collect();
 
     let mut sum_of_ids: u32 = 0;
+    let mut sum_of_powers: u32 = 0;
+
     for (game_id, game) in games.iter().enumerate() {
-        let elf_is_not_cheating: bool = is_game_valid(game);
+        let (elf_is_not_cheating, power_of_minimum_set): (bool, u32)  = is_game_valid(game);
         if elf_is_not_cheating {
             sum_of_ids += (game_id + 1) as u32;
         }
+        sum_of_powers += power_of_minimum_set;
     }
-    sum_of_ids
+    (sum_of_ids, sum_of_powers)
 }
 
